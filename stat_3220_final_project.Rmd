@@ -150,15 +150,27 @@ quartile_cols <- c("Q1 Low" = "steelblue", "Q2" = "darkorange", "Q3" = "darkgree
 
 ## Introduction
 
-1. Is an interaction between average age and political affiliation linked to larger Medicare beneficiary totals?
-2. Does greater health-care provider availability, measured by physicians per 100,000 residents, correspond to higher total Medicare beneficiary counts per state?
-3. Does higher median family income correspond to lower total Medicare beneficiary counts per state?
+1.  Is an interaction between average age and political affiliation linked to larger Medicare beneficiary totals?
+2.  Does greater health-care provider availability, measured by physicians per 100,000 residents, correspond to higher total Medicare beneficiary counts per state?
+3.  Does higher median family income correspond to lower total Medicare beneficiary counts per state?
 
 ## Data Summary
+
+**Metadata Summary**
+
+Intentionally left blank for now.
+
+**EDA Summary**
 
 This report only uses one 2023 observation for each of the 50 states. Before calculating the population quartiles, the total-state-population values for AK, AL, AR, and AZ were adjusted to be consistent with the listed state abbreviations provided in the original data set. The response variable, total Medicare beneficiaries, is strongly right-skewed: counts range between `r fmt_num(response_min, 0)` and `r fmt_num(response_max, 0)`, with mean of `r fmt_num(response_mean, 0)`, a median of `r fmt_num(response_median, 0)`, and IQR of `r fmt_num(response_iqr, 0)`. Because the mean is well above the median and the strong influence of a small number of extremely large states dominating the upper tail, a log transformation of the response variable seems appropriate before fitting the final regression model.
 
 Among the quantitative predictors, HCC score has the clearest positive association with beneficiary totals, with Pearson correlation `r round(hcc_r, 3)` on the untransformed response variable and `r round(hcc_log_r, 3)` when using `log(Y)`. Percent male shows the strongest negative correlation of the quantitative predictors, with correlations `r round(male_r, 3)` on the untransformed response variable and `r round(male_log_r, 3)` when using `log(Y)`. Average age appears weak on its own (r = `r round(age_r, 3)` on the raw scale), which makes the political affiliation-age interaction worth investigating rather than relying on a simple main-effect interpretation. Median income is nearly unrelated to the raw response variable (r = `r round(income_r, 3)`) and only very weakly negatively correlated when using `log(Y)` (r = `r round(income_log_r, 3)`), so any income effect may depend on adjustment for other predictors.
+
+## Analysis and Results
+
+FILL THIS SECTION WITH ANALYSIS OF PLOTS PRESENTED IN APPENDIX D
+
+## Conclusions
 
 \newpage
 
@@ -303,6 +315,7 @@ boxplot(
   main = "Beneficiaries by\nEducation Quartile"
 )
 ```
+
 This plot suggests some differences across education quartiles, but the pattern is not perfectly monotone. Mean beneficiary totals rise from `r fmt_num(education_means["Q1 Low"], 0)` in the lowest quartile to `r fmt_num(education_means["Q3"], 0)` in Q3 before dropping in Q4.
 
 ```{r plot-physician}
@@ -394,17 +407,33 @@ This plot examines whether a state's population size modifies the relationship b
 
 \newpage
 
+## Appendix D: Final Model Output and Plots (ADD PLOTS OF ANALYSIS TO THIS SECTION)
+
+```{r, echo=FALSE, warning=FALSE,results=FALSE}
+## This code chunk can be used to execute any functions or summaries that will not be included in your output
+```
+
+```{r, echo=FALSE}
+## Use this section to output the summary of your final model
+## Include the relevant plots from assumptions and your additional techniques
+## This should NOT be a dump of all of your plots and outputs.
+## Refer to the Rmarkdown guide for sizing information on your plots
+```
+
+\newpage
+
 ## Appendix E: References
-* Age and sex. (2023). American Community Survey. https://data.census.gov/chart/ACSST1Y2023.S0101?q=median+age+by+state&measure=LINE32&sort=abc
 
-* Electoral map: Blue or red states since 2000. (2026). Electoral Map: Blue or Red States since 2000. 270towin.
+-   Age and sex. (2023). American Community Survey. <https://data.census.gov/chart/ACSST1Y2023.S0101?q=median+age+by+state&measure=LINE32&sort=abc>
 
-* Medicare Geographic Variation - by National, State & County. (2025). Medicare Geographic Variation - by National, State & County. Centers for Medicare & Medicaid Services. https://data.cms.gov/summary-statistics-on-use-and-payments/medicare-geographic-comparisons/medicare-geographic-variation-by-national-state-county
+-   Electoral map: Blue or red states since 2000. (2026). Electoral Map: Blue or Red States since 2000. 270towin.
 
-* Newitt, P. (2025). Physicians per capita in all 50 states. Becker’s ASC Review. https://www.beckersasc.com/asc-news/physicians-per-capita-in-all-50-states-2/
+-   Medicare Geographic Variation - by National, State & County. (2025). Medicare Geographic Variation - by National, State & County. Centers for Medicare & Medicaid Services. <https://data.cms.gov/summary-statistics-on-use-and-payments/medicare-geographic-comparisons/medicare-geographic-variation-by-national-state-county>
 
-* US Census Bureau. (September 15, 2024). Median annual family income in the United States in 2023, by state (in U.S. dollars) [Graph]. In Statista. Retrieved April 12, 2026, from https://www.statista.com/statistics/236804/median-family-income-in-the-united-states-by-state/
+-   Newitt, P. (2025). Physicians per capita in all 50 states. Becker’s ASC Review. <https://www.beckersasc.com/asc-news/physicians-per-capita-in-all-50-states-2/>
 
-* Erickson, W., Lee, C., von Schrader, S. (2026). Disability Statistics from the American Community Survey (ACS). Ithaca, NY: Cornell University Yang-Tan Institute (YTI). Retrieved from Cornell University Disability Statistics website: www.disabilitystatistics.org
+-   US Census Bureau. (September 15, 2024). Median annual family income in the United States in 2023, by state (in U.S. dollars) [Graph]. In Statista. Retrieved April 12, 2026, from <https://www.statista.com/statistics/236804/median-family-income-in-the-united-states-by-state/>
+
+-   Erickson, W., Lee, C., von Schrader, S. (2026). Disability Statistics from the American Community Survey (ACS). Ithaca, NY: Cornell University Yang-Tan Institute (YTI). Retrieved from Cornell University Disability Statistics website: www.disabilitystatistics.org
 
 Note: Some of the vocabulary, grammar, and other wording in this report was refined using ChatGPT to give the most accurate data descriptions and analysis
