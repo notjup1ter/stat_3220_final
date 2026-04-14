@@ -53,10 +53,11 @@ set_plot_par <- function(bottom = 4.6, left = 4.5, top = 4.6, right = 1.1) {
 
 ```{r data, include=FALSE}
 raw_data<-read.csv(
-  "/Users/jb-schoolwork/Downloads/medicare_2023_state_mlr.csv",
+  "https://raw.githubusercontent.com/notjup1ter/stat_3220_final/refs/heads/main/medicare_2023_state_mlr.csv",
   check.names=FALSE,
   stringsAsFactors=FALSE,
 )
+raw_data
 
 # Realign the first four population values so they match the listed states.
 state_population <- as.numeric(gsub(",", "", raw_data[["TOTAL_STATE_POPULATION (Quantitative)"]]))
