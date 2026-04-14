@@ -149,9 +149,9 @@ quartile_cols <- c("Q1 Low" = "steelblue", "Q2" = "darkorange", "Q3" = "darkgree
 
 ## Introduction
 
-1.  Is an interaction between average age and political affiliation linked to larger Medicare beneficiary totals?
-2.  Does greater health-care provider availability, measured by physicians per 100,000 residents, correspond to higher total Medicare beneficiary counts per state?
-3.  Does higher median family income correspond to lower total Medicare beneficiary counts per state?
+1. Do states with certain combinations of average age and political affiliation have higher total Medicare beneficiary counts?                                                                     
+2. Do states with greater healthcare provider availability ( measured by physicians per 100,000 residents) have higher total Medicare beneficiary counts?
+3. Do states with higher median family incomes have lower total Medicare beneficiary counts?
 
 ## Data Summary
 
