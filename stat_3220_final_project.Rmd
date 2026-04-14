@@ -2,7 +2,7 @@
 title: "Predicting Total Medicare Beneficiaries by State (2023)"
 author: |
   | By: Team G11 (Sidharth Dusanapudi, Ashish Sunkarapalli,
-  | Jayden Sincere Brown, Krish Venkatram Mallina)
+  | Jayden Sincerely Brown, Krish Venkatram Mallina)
 fontsize: 12pt
 geometry: margin=1in
 urlcolor: black
