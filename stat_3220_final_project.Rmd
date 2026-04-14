@@ -1,0 +1,409 @@
+---
+title: "Predicting Total Medicare Beneficiaries by State (2023)"
+author: |
+  | By: Team G11 (Sidharth Dusanapudi, Ashish Sunkarapalli,
+  | Jayden Sincere Brown, Krish Venkatram Mallina)
+fontsize: 12pt
+geometry: margin=1in
+urlcolor: black
+output: pdf_document
+header-includes:
+- \usepackage{setspace}
+- \onehalfspacing
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE,
+  comment = NA,
+  highlight = FALSE,
+  fig.align = "center",
+  fig.width = 6.5,
+  fig.height = 4.3,
+  out.width = "92%"
+)
+
+library(knitr)
+
+fmt_num <- function(x, digits = 0) {
+  formatC(x, format = "f", digits = digits, big.mark = ",")
+}
+
+quartile_factor <- function(x) {
+  cut(
+    x,
+    breaks = quantile(x, probs = seq(0, 1, 0.25), na.rm = TRUE),
+    include.lowest = TRUE,
+    labels = c("Q1 Low", "Q2", "Q3", "Q4 High")
+  )
+}
+
+set_plot_par <- function(bottom = 4.6, left = 4.5, top = 4.6, right = 1.1) {
+  par(
+    mar = c(bottom, left, top, right),
+    mgp = c(2.6, 0.8, 0),
+    cex.main = 0.92,
+    cex.lab = 0.95,
+    cex.axis = 0.88
+  )
+}
+```
+
+```{r data, include=FALSE}
+raw_data<-read.csv(
+  "/Users/jb-schoolwork/Downloads/medicare_2023_state_mlr.csv",
+  check.names=FALSE,
+  stringsAsFactors=FALSE,
+)
+
+# Realign the first four population values so they match the listed states.
+state_population <- as.numeric(gsub(",", "", raw_data[["TOTAL_STATE_POPULATION (Quantitative)"]]))
+state_population[raw_data$STATE == "AK"] <- 734654
+state_population[raw_data$STATE == "AL"] <- 5117850
+state_population[raw_data$STATE == "AR"] <- 3069856
+state_population[raw_data$STATE == "AZ"] <- 7452073
+
+analysis_data <- data.frame(
+  State = raw_data$STATE,
+  Beneficiaries = raw_data$BENES_TOTAL_CNT,
+  Avg_Age = raw_data$AVG_AGE,
+  HCC_Score = raw_data$HCC_SCORE,
+  Pct_Male = raw_data$PERCENT_MALE,
+  Median_Income = raw_data[["Median annual family income in the United States"]],
+  Political_Affiliation = factor(
+    raw_data[["POLITICAL_AFFILIATION (Qualitative)"]],
+    levels = c("Democrat", "Republican", "Swing")
+  ),
+  Education_Q = quartile_factor(raw_data[["% Bachelor's Degree or Higher by State (Qualitative)"]]),
+  Physician_Q = quartile_factor(raw_data[["PHYSICIANS_PER_100000 (Qualitative)"]]),
+  Population_Q = quartile_factor(state_population)
+)
+
+analysis_data$log_Beneficiaries <- log(analysis_data$Beneficiaries)
+
+display_data <- analysis_data[, c(
+  "State", "Beneficiaries", "Avg_Age", "HCC_Score", "Pct_Male",
+  "Median_Income", "Political_Affiliation", "Education_Q",
+  "Physician_Q", "Population_Q"
+)]
+
+display_data$Beneficiaries <- fmt_num(display_data$Beneficiaries, 0)
+display_data$Avg_Age <- fmt_num(display_data$Avg_Age, 1)
+display_data$HCC_Score <- fmt_num(display_data$HCC_Score, 2)
+display_data$Pct_Male <- fmt_num(display_data$Pct_Male, 4)
+display_data$Median_Income <- fmt_num(display_data$Median_Income, 0)
+
+data_dictionary <- data.frame(
+  Variable = c(
+    "State", "Beneficiaries", "Avg_Age", "HCC_Score", "Pct_Male",
+    "Median_Income", "Political_Affiliation", "Education_Q",
+    "Physician_Q", "Population_Q"
+  ),
+  Type = c(
+    "Identifier", "Response", "Quantitative", "Quantitative", "Quantitative",
+    "Quantitative", "Qualitative", "Qualitative", "Qualitative", "Qualitative"
+  ),
+  Description = c(
+    "Two-letter state abbreviation.",
+    "Total Medicare beneficiaries in the state.",
+    "Average beneficiary age.",
+    "Hierarchical condition category risk score.",
+    "Proportion of beneficiaries who are male.",
+    "Median annual family income.",
+    "State political affiliation from the source file.",
+    "Quartile of bachelor's degree percentage by state.",
+    "Quartile of physicians per 100,000 residents.",
+    "Quartile of corrected total state population."
+  )
+)
+
+response_mean <- mean(analysis_data$Beneficiaries)
+response_median <- median(analysis_data$Beneficiaries)
+response_min <- min(analysis_data$Beneficiaries)
+response_max <- max(analysis_data$Beneficiaries)
+response_iqr <- IQR(analysis_data$Beneficiaries)
+
+age_r <- cor(analysis_data$Avg_Age, analysis_data$Beneficiaries)
+hcc_r <- cor(analysis_data$HCC_Score, analysis_data$Beneficiaries)
+male_r <- cor(analysis_data$Pct_Male, analysis_data$Beneficiaries)
+income_r <- cor(analysis_data$Median_Income, analysis_data$Beneficiaries)
+
+age_log_r <- cor(analysis_data$Avg_Age, analysis_data$log_Beneficiaries)
+hcc_log_r <- cor(analysis_data$HCC_Score, analysis_data$log_Beneficiaries)
+male_log_r <- cor(analysis_data$Pct_Male, analysis_data$log_Beneficiaries)
+income_log_r <- cor(analysis_data$Median_Income, analysis_data$log_Beneficiaries)
+
+party_means <- tapply(analysis_data$Beneficiaries, analysis_data$Political_Affiliation, mean)
+education_means <- tapply(analysis_data$Beneficiaries, analysis_data$Education_Q, mean)
+physician_means <- tapply(analysis_data$Beneficiaries, analysis_data$Physician_Q, mean)
+population_means <- tapply(analysis_data$Beneficiaries, analysis_data$Population_Q, mean)
+population_log_means <- tapply(analysis_data$log_Beneficiaries, analysis_data$Population_Q, mean)
+
+party_cols <- c("Democrat" = "steelblue", "Republican" = "firebrick", "Swing" = "darkgreen")
+quartile_cols <- c("Q1 Low" = "steelblue", "Q2" = "darkorange", "Q3" = "darkgreen", "Q4 High" = "firebrick")
+```
+
+\newpage
+
+## Introduction
+
+1. Is an interaction between average age and political affiliation linked to larger Medicare beneficiary totals?
+2. Does greater health-care provider availability, measured by physicians per 100,000 residents, correspond to higher total Medicare beneficiary counts per state?
+3. Does higher median family income correspond to lower total Medicare beneficiary counts per state?
+
+## Data Summary
+
+This report only uses one 2023 observation for each of the 50 states. Before calculating the population quartiles, the total-state-population values for AK, AL, AR, and AZ were adjusted to be consistent with the listed state abbreviations provided in the original data set. The response variable, total Medicare beneficiaries, is strongly right-skewed: counts range between `r fmt_num(response_min, 0)` and `r fmt_num(response_max, 0)`, with mean of `r fmt_num(response_mean, 0)`, a median of `r fmt_num(response_median, 0)`, and IQR of `r fmt_num(response_iqr, 0)`. Because the mean is well above the median and the strong influence of a small number of extremely large states dominating the upper tail, a log transformation of the response variable seems appropriate before fitting the final regression model.
+
+Among the quantitative predictors, HCC score has the clearest positive association with beneficiary totals, with Pearson correlation `r round(hcc_r, 3)` on the untransformed response variable and `r round(hcc_log_r, 3)` when using `log(Y)`. Percent male shows the strongest negative correlation of the quantitative predictors, with correlations `r round(male_r, 3)` on the untransformed response variable and `r round(male_log_r, 3)` when using `log(Y)`. Average age appears weak on its own (r = `r round(age_r, 3)` on the raw scale), which makes the political affiliation-age interaction worth investigating rather than relying on a simple main-effect interpretation. Median income is nearly unrelated to the raw response variable (r = `r round(income_r, 3)`) and only very weakly negatively correlated when using `log(Y)` (r = `r round(income_log_r, 3)`), so any income effect may depend on adjustment for other predictors.
+
+\newpage
+
+## Appendix A: Data Dictionary
+
+Data dictionary for the cleaned analysis dataset.
+
+```{r appendix-a, results='asis'}
+print(
+  kable(
+    data_dictionary,
+    format = "latex",
+    booktabs = FALSE,
+    longtable = FALSE,
+    align = c("l", "l", "p{3.85in}"),
+    linesep = ""
+  )
+)
+```
+
+\newpage
+
+## Appendix B: Data Rows
+
+`head()` of the cleaned analysis data.
+
+```{r appendix-b, results='asis'}
+cat("\\begingroup\\scriptsize\n")
+cat("\\resizebox{\\textwidth}{!}{%\n")
+print(
+  kable(
+    head(display_data),
+    format = "latex",
+    booktabs = FALSE,
+    longtable = FALSE,
+    align = "llllllllll",
+    linesep = ""
+  )
+)
+cat("}\n")
+cat("\\endgroup\n")
+```
+
+\newpage
+
+## Appendix C: Exploratory Data Analysis
+
+### Response Variable Plot
+
+```{r response-plot}
+set_plot_par()
+hist(
+  analysis_data$Beneficiaries,
+  breaks = 10,
+  col = "gray80",
+  border = "white",
+  main = "Histogram of Total\nMedicare Beneficiaries",
+  xlab = "Total Medicare beneficiaries"
+)
+```
+
+This histogram shows a strong right-skew, with most states clustered at lower beneficiary counts and a small number of very large states extending the right tail. This shape supports considering `log(Y)` in later regression work.
+
+### Quantitative Predictor Plots
+
+```{r plot-age}
+set_plot_par()
+plot(
+  analysis_data$Avg_Age, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "Average age", ylab = "Beneficiaries",
+  main = "Beneficiaries vs\nAverage Age"
+)
+abline(lm(Beneficiaries ~ Avg_Age, data = analysis_data), col = "firebrick", lwd = 2)
+```
+
+This scatterplot shows only a weak overall linear relationship between average age and beneficiary totals, which matches the small raw correlation of `r round(age_r, 3)`. The broad vertical spread suggests age may matter more through interactions than as a stand-alone predictor.
+
+```{r plot-hcc}
+set_plot_par()
+plot(
+  analysis_data$HCC_Score, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "HCC score", ylab = "Beneficiaries",
+  main = "Beneficiaries vs\nHCC Score"
+)
+abline(lm(Beneficiaries ~ HCC_Score, data = analysis_data), col = "firebrick", lwd = 2)
+```
+
+This plot shows the clearest positive quantitative pattern in the EDA. States with higher HCC scores tend to have larger beneficiary totals, consistent with the positive raw-response correlation of `r round(hcc_r, 3)`.
+
+```{r plot-male}
+set_plot_par()
+plot(
+  analysis_data$Pct_Male, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "Percent male", ylab = "Beneficiaries",
+  main = "Beneficiaries vs\nPercent Male"
+)
+abline(lm(Beneficiaries ~ Pct_Male, data = analysis_data), col = "firebrick", lwd = 2)
+```
+
+This scatterplot suggests a negative association between percent male and beneficiary totals. The downward fitted line agrees with the negative correlation of `r round(male_r, 3)`, although there is still substantial variation around the trend.
+
+```{r plot-income}
+set_plot_par()
+plot(
+  analysis_data$Median_Income, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "Median family income", ylab = "Beneficiaries",
+  main = "Beneficiaries vs\nMedian Income"
+)
+abline(lm(Beneficiaries ~ Median_Income, data = analysis_data), col = "firebrick", lwd = 2)
+```
+
+This plot shows a negligible linear relationship between median family income and beneficiary totals. The nearly flat fitted line is consistent with the very small correlation of `r round(income_r, 3)`.
+
+### Qualitative Predictor Plots
+
+```{r plot-party}
+set_plot_par(bottom = 4.8)
+boxplot(
+  Beneficiaries ~ Political_Affiliation,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by\nPolitical Affiliation"
+)
+```
+
+This boxplot compares beneficiary totals across political-affiliation groups. Democratic and swing states have higher average totals than Republican states in this sample, although there is still overlap across the three groups.
+
+```{r plot-education}
+set_plot_par(bottom = 4.8)
+boxplot(
+  Beneficiaries ~ Education_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by\nEducation Quartile"
+)
+```
+This plot suggests some differences across education quartiles, but the pattern is not perfectly monotone. Mean beneficiary totals rise from `r fmt_num(education_means["Q1 Low"], 0)` in the lowest quartile to `r fmt_num(education_means["Q3"], 0)` in Q3 before dropping in Q4.
+
+```{r plot-physician}
+set_plot_par(bottom = 4.8)
+boxplot(
+  Beneficiaries ~ Physician_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by\nPhysician Quartile"
+)
+```
+
+This boxplot indicates that physician availability does not increase in a simple step-by-step way with beneficiary totals. The group means vary across quartiles, but the ordering is uneven, so regression adjustment will be more informative than the unadjusted comparison alone.
+
+```{r plot-population}
+set_plot_par(bottom = 4.8)
+boxplot(
+  Beneficiaries ~ Population_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by\nPopulation Quartile"
+)
+```
+
+This plot shows the strongest qualitative separation in the appendix. States in higher population quartiles generally have larger beneficiary totals, with the highest-quartile mean of `r fmt_num(population_means["Q4 High"], 0)` compared with `r fmt_num(population_means["Q1 Low"], 0)` in the lowest quartile.
+
+### Interaction Plots
+
+```{r interaction-age-party}
+set_plot_par(top = 5)
+plot(
+  analysis_data$Avg_Age, analysis_data$log_Beneficiaries,
+  type = "n",
+  xlab = "Average age",
+  ylab = "log(Beneficiaries)",
+  main = "Interaction Screen:\nAge x Political Affiliation"
+)
+for (grp in levels(analysis_data$Political_Affiliation)) {
+  idx <- analysis_data$Political_Affiliation == grp
+  points(analysis_data$Avg_Age[idx], analysis_data$log_Beneficiaries[idx], pch = 19, col = party_cols[grp])
+  abline(lm(log_Beneficiaries ~ Avg_Age, data = analysis_data[idx, ]), col = party_cols[grp], lwd = 2)
+}
+legend("bottomright", legend = levels(analysis_data$Political_Affiliation), col = party_cols, pch = 19, bty = "n", cex = 0.82)
+```
+
+This interaction plot reveals that the relationship between a state's average Medicare age and its total number of beneficiaries depends heavily on its political affiliation. While Republican and Swing states exhibit nearly parallel, relatively flat trend lines indicating that average age has little impact on total enrollment in those regions, Democratic states display a steep downward slope. This distinct difference in slopes suggests a strong interaction effect, meaning our final model should account for political affiliation rather than assuming a uniform relationship between age and beneficiaries across all states.
+
+```{r interaction-hcc-physician}
+set_plot_par(top = 5)
+plot(
+  analysis_data$HCC_Score, analysis_data$log_Beneficiaries,
+  type = "n",
+  xlab = "HCC score",
+  ylab = "log(Beneficiaries)",
+  main = "Interaction Screen:\nHCC Score x Physician Quartile"
+)
+for (grp in levels(analysis_data$Physician_Q)) {
+  idx <- analysis_data$Physician_Q == grp
+  points(analysis_data$HCC_Score[idx], analysis_data$log_Beneficiaries[idx], pch = 19, col = quartile_cols[grp])
+  abline(lm(log_Beneficiaries ~ HCC_Score, data = analysis_data[idx, ]), col = quartile_cols[grp], lwd = 2)
+}
+legend("bottomright", legend = levels(analysis_data$Physician_Q), col = quartile_cols, pch = 19, bty = "n", cex = 0.82)
+```
+
+This plot examines whether physician availability modifies the relationship between a state's HCC score and its total beneficiaries. Because the trend lines for all four quartiles are heavily overlapping and nearly parallel, there is no visual evidence of an interaction effect. This suggests that the relationship between a state's medical risk and its beneficiary count remains consistent regardless of the state's physician rate, thus indicating no interaction amongst these two explanatory variables.
+
+```{r interaction-income-pop}
+set_plot_par(top = 5)
+plot(
+  analysis_data$Median_Income, analysis_data$log_Beneficiaries,
+  type = "n",
+  xlab = "Median family income",
+  ylab = "log(Beneficiaries)",
+  main = "Interaction Screen:\nIncome x Population Quartile"
+)
+for (grp in levels(analysis_data$Population_Q)) {
+  idx <- analysis_data$Population_Q == grp
+  points(analysis_data$Median_Income[idx], analysis_data$log_Beneficiaries[idx], pch = 19, col = quartile_cols[grp])
+  abline(lm(log_Beneficiaries ~ Median_Income, data = analysis_data[idx, ]), col = quartile_cols[grp], lwd = 2)
+}
+legend("bottomright", legend = levels(analysis_data$Population_Q), col = quartile_cols, pch = 19, bty = "n", cex = 0.82)
+```
+
+This plot examines whether a state's population size modifies the relationship between its median income and total number of beneficiaries. Because the trend lines for the four population quartiles are roughly parallel, there is no strong visual evidence of an interaction effect altering the slopes. However, it is seen that Q1 and Q3 of population sizes have flat/slightly positive slopes, while Q2 and Q4 are slightly negative, but these differences are not major enough, subjectively, to indicate any major interaction occurring.
+
+\newpage
+
+## Appendix E: References
+* Age and sex. (2023). American Community Survey. https://data.census.gov/chart/ACSST1Y2023.S0101?q=median+age+by+state&measure=LINE32&sort=abc
+
+* Electoral map: Blue or red states since 2000. (2026). Electoral Map: Blue or Red States since 2000. 270towin.
+
+* Medicare Geographic Variation - by National, State & County. (2025). Medicare Geographic Variation - by National, State & County. Centers for Medicare & Medicaid Services. https://data.cms.gov/summary-statistics-on-use-and-payments/medicare-geographic-comparisons/medicare-geographic-variation-by-national-state-county
+
+* Newitt, P. (2025). Physicians per capita in all 50 states. Becker’s ASC Review. https://www.beckersasc.com/asc-news/physicians-per-capita-in-all-50-states-2/
+
+* US Census Bureau. (September 15, 2024). Median annual family income in the United States in 2023, by state (in U.S. dollars) [Graph]. In Statista. Retrieved April 12, 2026, from https://www.statista.com/statistics/236804/median-family-income-in-the-united-states-by-state/
+
+* Erickson, W., Lee, C., von Schrader, S. (2026). Disability Statistics from the American Community Survey (ACS). Ithaca, NY: Cornell University Yang-Tan Institute (YTI). Retrieved from Cornell University Disability Statistics website: www.disabilitystatistics.org
+
+Note: Some of the vocabulary, grammar, and other wording in this report was refined using ChatGPT to give the most accurate data descriptions and analysis
