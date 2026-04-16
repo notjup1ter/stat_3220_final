@@ -390,18 +390,33 @@ This plot examines whether a state's population size modifies the relationship b
 ## Appendix D: Final Model Output and Plots (ADD PLOTS OF ANALYSIS TO THIS SECTION)
 
 ```{r, echo=FALSE, warning=FALSE,results=FALSE}
+## Analysis of Multicollinearity
+# Heatmap
+BeneficiariesCorr <-round(cor(analysis_data[,c(3:6)]),4)
+BeneficiariesCorr
+corrplot(BeneficiariesCorr)
+
+# VIF Analysis
+#store and round the VIF values
+BenMod_NoQual <- lm(log_Beneficiaries~Avg_Age+HCC_Score+Pct_Male+Median_Income, data=analysis_data)
+BenMod1vif<-round(vif(BenMod_NoQual),3)
+BenMod1vif
+
+#find the average VIF
+mean(BenMod1vif)
+
+
+
 ## Linear regression via an unweighted least squares approach
 
-Beneficiaries_Model <- lm(analysis_data$log_Beneficiaries~analysis_data$Avg_Age+analysis_data$HCC_Score+analysis_data$Pct_Male+analysis_data$Median_Income+analysis_data$Political_Affiliation+analysis_data$Education_Q+analysis_data$Physician_Q+analysis_data$Population_Q)
+Beneficiaries_Model <- lm(log_Beneficiaries~Avg_Age+HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q, data=analysis_data)
 
-Beneficiaries_Model
-
+summary(Beneficiaries_Model)
 ## Residual Plot Analysis
 
 residualPlots(Beneficiaries_Model, tests=F)
 plot(Beneficiaries_Model, which=c(1,2))
 hist(residuals(Beneficiaries_Model))
-
 ```
 
 ```{r, echo=FALSE}
