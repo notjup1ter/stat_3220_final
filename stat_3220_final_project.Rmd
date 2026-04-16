@@ -25,6 +25,7 @@ knitr::opts_chunk$set(
 	out.width = "92%"
 )
 library(knitr)
+library(car)
 
 fmt_num <- function(x, digits = 0) {
   formatC(x, format = "f", digits = digits, big.mark = ",")
@@ -164,10 +165,6 @@ Intentionally left blank for now.
 This report only uses one 2023 observation for each of the 50 states. Before calculating the population quartiles, the total-state-population values for AK, AL, AR, and AZ were adjusted to be consistent with the listed state abbreviations provided in the original data set. The response variable, total Medicare beneficiaries, is strongly right-skewed: counts range between `r fmt_num(response_min, 0)` and `r fmt_num(response_max, 0)`, with mean of `r fmt_num(response_mean, 0)`, a median of `r fmt_num(response_median, 0)`, and IQR of `r fmt_num(response_iqr, 0)`. Because the mean is well above the median and the strong influence of a small number of extremely large states dominating the upper tail, a log transformation of the response variable seems appropriate before fitting the final regression model.
 
 Among the quantitative predictors, HCC score has the clearest positive association with beneficiary totals, with Pearson correlation `r round(hcc_r, 3)` on the untransformed response variable and `r round(hcc_log_r, 3)` when using `log(Y)`. Percent male shows the strongest negative correlation of the quantitative predictors, with correlations `r round(male_r, 3)` on the untransformed response variable and `r round(male_log_r, 3)` when using `log(Y)`. Average age appears weak on its own (r = `r round(age_r, 3)` on the raw scale), which makes the political affiliation-age interaction worth investigating rather than relying on a simple main-effect interpretation. Median income is nearly unrelated to the raw response variable (r = `r round(income_r, 3)`) and only very weakly negatively correlated when using `log(Y)` (r = `r round(income_log_r, 3)`), so any income effect may depend on adjustment for other predictors.
-
-In terms of qualitative predictors, population quartile exhibits the strongest visual separation, where the fourth-quartile average is at `r fmt_num(population_means["Q4 High"], 0)` whereas in the first quartile it is only `r fmt_num(population_means["Q1 Low"], 0)`. Political affiliation also shows some distinctions in means of the number of beneficiaries, which for Swing and Democratic states is higher compared to Republican states. On the other hand, the relationship between beneficiary totals and categorical predictors such as education and physician quartile is somewhat less consistent, as the average number of beneficiaries increases from Q1 (which is `r fmt_num(education_means["Q1 Low"], 0)`) to Q3 (`r fmt_num(education_means["Q3"], 0)`) before declining in Q4. 
-
-When assessing potential interactions using log(Y), the relationship between average beneficiary age and log-transformed beneficiaries varies heavily depending on political affiliation. While Republican and swing states exhibit relatively flat trends, Democratic states display a steep negative association with log(Y), pointing to a strong interaction effect that warrants inclusion in the final model. Other investigated interactions, including HCC score by physician quartile and median income by population quartile plotted against log(Y), yielded nearly parallel trend lines, indicating no substantial interactive effects among those specific explanatory variables.
 
 ## Analysis and Results
 
@@ -418,6 +415,12 @@ This plot examines whether a state's population size modifies the relationship b
 Beneficiaries_Model <- lm(analysis_data$log_Beneficiaries~analysis_data$Avg_Age+analysis_data$HCC_Score+analysis_data$Pct_Male+analysis_data$Median_Income+analysis_data$Political_Affiliation+analysis_data$Education_Q+analysis_data$Physician_Q+analysis_data$Population_Q)
 
 Beneficiaries_Model
+
+## Residual Plot Analysis
+
+residualPlots(Beneficiaries_Model, tests=F)
+plot(Beneficiaries_Model, which=c(1,2))
+hist(residuals(Beneficiaries_Model))
 
 ```
 
