@@ -84,23 +84,11 @@ analysis_data <- data.frame(
 
 analysis_data$log_Beneficiaries <- log(analysis_data$Beneficiaries)
 
-display_data <- analysis_data[, c(
-  "State", "Beneficiaries", "Avg_Age", "HCC_Score", "Pct_Male",
-  "Median_Income", "Political_Affiliation", "Education_Q",
-  "Physician_Q", "Population_Q"
-)]
-
-display_data$Beneficiaries <- fmt_num(display_data$Beneficiaries, 0)
-display_data$Avg_Age <- fmt_num(display_data$Avg_Age, 1)
-display_data$HCC_Score <- fmt_num(display_data$HCC_Score, 2)
-display_data$Pct_Male <- fmt_num(display_data$Pct_Male, 4)
-display_data$Median_Income <- fmt_num(display_data$Median_Income, 0)
-
 data_dictionary <- data.frame(
   Variable = c(
-    "State", "Beneficiaries", "Avg_Age", "HCC_Score", "Pct_Male",
-    "Median_Income", "Political_Affiliation", "Education_Q",
-    "Physician_Q", "Population_Q"
+    "State", "Beneficiaries", "Avg\\_Age", "HCC\\_Score", "Pct\\_Male",
+    "Median\\_Income", "Political\\_Affiliation", "Education\\_Q",
+    "Physician\\_Q", "Population\\_Q"
   ),
   Type = c(
     "Identifier", "Response", "Quantitative", "Quantitative", "Quantitative",
@@ -108,15 +96,15 @@ data_dictionary <- data.frame(
   ),
   Description = c(
     "Two-letter state abbreviation.",
-    "Total Medicare beneficiaries in the state.",
-    "Average beneficiary age.",
-    "Hierarchical condition category risk score.",
-    "Proportion of beneficiaries who are male.",
-    "Median annual family income.",
-    "State political affiliation from the source file.",
-    "Quartile of bachelor's degree percentage by state.",
-    "Quartile of physicians per 100,000 residents.",
-    "Quartile of corrected total state population."
+    "Total Medicare beneficiaries in the state (measured in people).",
+    "Average beneficiary age (measured in years).",
+    "Hierarchical condition category risk score (unitless index/multiplier).",
+    "Proportion of beneficiaries who are male (measured from 0 to 1).",
+    "Median annual family income (measured in US Dollars).",
+    "State political affiliation. \\newline Levels: Democrat, Republican, Swing.",
+    "Quartile of bachelor's degree percentage by state. \\newline Levels: Q1 Low, Q2, Q3, Q4 High.",
+    "Quartile of physicians per 100,000 residents. \\newline Levels: Q1 Low, Q2, Q3, Q4 High.",
+    "Quartile of corrected total state population. \\newline Levels: Q1 Low, Q2, Q3, Q4 High."
   )
 )
 
@@ -190,7 +178,8 @@ print(
     booktabs = FALSE,
     longtable = FALSE,
     align = c("l", "l", "p{3.85in}"),
-    linesep = ""
+    linesep = "",
+    escape = FALSE
   )
 )
 ```
