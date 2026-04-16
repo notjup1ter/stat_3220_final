@@ -149,9 +149,9 @@ quartile_cols <- c("Q1 Low" = "steelblue", "Q2" = "darkorange", "Q3" = "darkgree
 
 ## Introduction
 
-1. Do states with certain combinations of average age and political affiliation have higher total Medicare beneficiary counts?                                                                     
-2. Do states with greater healthcare provider availability ( measured by physicians per 100,000 residents) have higher total Medicare beneficiary counts?
-3. Do states with higher median family incomes have lower total Medicare beneficiary counts?
+1.  Do states with certain combinations of average age and political affiliation have higher total Medicare beneficiary counts?\
+2.  Do states with greater healthcare provider availability ( measured by physicians per 100,000 residents) have higher total Medicare beneficiary counts?
+3.  Do states with higher median family incomes have lower total Medicare beneficiary counts?
 
 ## Data Summary
 
@@ -413,7 +413,12 @@ This plot examines whether a state's population size modifies the relationship b
 ## Appendix D: Final Model Output and Plots (ADD PLOTS OF ANALYSIS TO THIS SECTION)
 
 ```{r, echo=FALSE, warning=FALSE,results=FALSE}
-## This code chunk can be used to execute any functions or summaries that will not be included in your output
+## Linear regression via an unweighted least squares approach
+
+Beneficiaries_Model <- lm(analysis_data$log_Beneficiaries~analysis_data$Avg_Age+analysis_data$HCC_Score+analysis_data$Pct_Male+analysis_data$Median_Income+analysis_data$Political_Affiliation+analysis_data$Education_Q+analysis_data$Physician_Q+analysis_data$Population_Q)
+
+Beneficiaries_Model
+
 ```
 
 ```{r, echo=FALSE}
