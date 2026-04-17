@@ -28,6 +28,7 @@ library(knitr)
 library(car)
 library(caret)
 library(corrplot)
+library(MASS)
 
 fmt_num <- function(x, digits = 0) {
   formatC(x, format = "f", digits = digits, big.mark = ",")
@@ -421,7 +422,28 @@ plot(Beneficiaries_Model, which=c(1,2))
 hist(residuals(Beneficiaries_Model))
 ```
 
+```{r, echo=FALSE, warning=FALSE,results=FALSE}
+#box-cox transformation to idealize assumptions
+BC_Model <- boxcox(Beneficiaries_Model)
+optimal_lambda <- BC_Model$x[which.max(BC_Model$y)]
 
+if (optimal_lambda == 0) {
+  transformed_y <- log(analysis_data$log_Beneficiaries)
+} else {
+  transformed_y <- (analysis_data$log_Beneficiaries^optimal_lambda - 1) / optimal_lambda
+}
+
+Beneficiaries_Model_BCTransform <- lm(transformed_y ~ Avg_Age + HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q + Avg_Age * Political_Affiliation, data=analysis_data)
+
+#Summary
+summary(Beneficiaries_Model_BCTransform)
+
+residualPlots(Beneficiaries_Model_BCTransform, tests=F)
+plot(Beneficiaries_Model_BCTransform, which=c(1,2))
+hist(residuals(Beneficiaries_Model_BCTransform))
+#Residual Analysis
+
+```
 
 
 ```{r, echo=FALSE}
