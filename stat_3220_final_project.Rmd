@@ -411,7 +411,7 @@ mean(BenMod1vif)
 
 ## Linear regression via an unweighted least squares approach
 
-Beneficiaries_Model <- lm(log_Beneficiaries~Avg_Age+HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q, data=analysis_data)
+Beneficiaries_Model <- lm(log_Beneficiaries~Avg_Age+HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q + Avg_Age * Political_Affiliation, data=analysis_data)
 
 summary(Beneficiaries_Model)
 ## Residual Plot Analysis
@@ -422,28 +422,6 @@ hist(residuals(Beneficiaries_Model))
 ```
 
 
-
-```{r, echo=FALSE, warning=FALSE,results=FALSE}
-#Adding quadratic term for Avg_Age Var
-analysis_data$Avg_Age_sq <- analysis_data$Avg_Age^2
-Beneficiaries_Model_02 <- lm(log_Beneficiaries~Avg_Age+Avg_Age_sq +HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q, data=analysis_data)
-```
-
-```{r, echo=FALSE, warning=FALSE,results=FALSE}
-
-
-#summary
-summary(Beneficiaries_Model_02)
-
-#Rechecking Residual Analysis
-residualPlots(Beneficiaries_Model_02, tests=F)
-plot(Beneficiaries_Model_02, which=c(1,2))
-hist(residuals(Beneficiaries_Model_02))
-
-
-
-
-```
 
 
 ```{r, echo=FALSE}
