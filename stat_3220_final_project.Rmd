@@ -26,6 +26,8 @@ knitr::opts_chunk$set(
 )
 library(knitr)
 library(car)
+library(caret)
+library(corrplot)
 
 fmt_num <- function(x, digits = 0) {
   formatC(x, format = "f", digits = digits, big.mark = ",")
@@ -418,6 +420,31 @@ residualPlots(Beneficiaries_Model, tests=F)
 plot(Beneficiaries_Model, which=c(1,2))
 hist(residuals(Beneficiaries_Model))
 ```
+
+
+
+```{r, echo=FALSE, warning=FALSE,results=FALSE}
+#Adding quadratic term for Avg_Age Var
+analysis_data$Avg_Age_sq <- analysis_data$Avg_Age^2
+Beneficiaries_Model_02 <- lm(log_Beneficiaries~Avg_Age+Avg_Age_sq +HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q, data=analysis_data)
+```
+
+```{r, echo=FALSE, warning=FALSE,results=FALSE}
+
+
+#summary
+summary(Beneficiaries_Model_02)
+
+#Rechecking Residual Analysis
+residualPlots(Beneficiaries_Model_02, tests=F)
+plot(Beneficiaries_Model_02, which=c(1,2))
+hist(residuals(Beneficiaries_Model_02))
+
+
+
+
+```
+
 
 ```{r, echo=FALSE}
 ## Use this section to output the summary of your final model
