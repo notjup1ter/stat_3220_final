@@ -34,10 +34,6 @@ library(knitr)
 library(car)
 library(caret)
 library(corrplot)
-<<<<<<< Updated upstream
-library(MASS)
-=======
->>>>>>> Stashed changes
 
 fmt_num <- function(x, digits = 0) {
   formatC(x, format = "f", digits = digits, big.mark = ",")
@@ -606,55 +602,6 @@ boxplot(
   main = "Beneficiaries by Education Q"
 )
 
-<<<<<<< Updated upstream
-#find the average VIF
-mean(BenMod1vif)
-
-
-
-## Linear regression via an unweighted least squares approach
-
-Beneficiaries_Model <- lm(log_Beneficiaries~Avg_Age+HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q + Avg_Age * Political_Affiliation, data=analysis_data)
-
-summary(Beneficiaries_Model)
-## Residual Plot Analysis
-
-residualPlots(Beneficiaries_Model, tests=F)
-plot(Beneficiaries_Model, which=c(1,2))
-hist(residuals(Beneficiaries_Model))
-```
-
-```{r, echo=FALSE, warning=FALSE,results=FALSE}
-#box-cox transformation to idealize assumptions
-BC_Model <- boxcox(Beneficiaries_Model)
-optimal_lambda <- BC_Model$x[which.max(BC_Model$y)]
-
-if (optimal_lambda == 0) {
-  transformed_y <- log(analysis_data$log_Beneficiaries)
-} else {
-  transformed_y <- (analysis_data$log_Beneficiaries^optimal_lambda - 1) / optimal_lambda
-}
-
-Beneficiaries_Model_BCTransform <- lm(transformed_y ~ Avg_Age + HCC_Score+Pct_Male+Median_Income+Political_Affiliation+Education_Q+Physician_Q+Population_Q + Avg_Age * Political_Affiliation, data=analysis_data)
-
-#Summary
-summary(Beneficiaries_Model_BCTransform)
-
-residualPlots(Beneficiaries_Model_BCTransform, tests=F)
-plot(Beneficiaries_Model_BCTransform, which=c(1,2))
-hist(residuals(Beneficiaries_Model_BCTransform))
-#Residual Analysis
-
-```
-
-
-```{r, echo=FALSE}
-## Use this section to output the summary of your final model
-## Include the relevant plots from assumptions and your additional techniques
-## This should NOT be a dump of all of your plots and outputs.
-## Refer to the Rmarkdown guide for sizing information on your plots
-```
-=======
 boxplot(
   Beneficiaries ~ Population_Q,
   data = analysis_data,
@@ -668,7 +615,6 @@ layout(1)
 The second page focuses on the strongest supporting predictors kept in the final analysis. HCC score has the clearest positive quantitative association with beneficiary totals, with raw-scale correlation `r round(hcc_r, 3)`, and population quartile shows the strongest qualitative separation, with the highest quartile averaging `r fmt_num(population_means["Q4 High"], 0)` beneficiaries compared with `r fmt_num(population_means["Q1 Low"], 0)` in Q1. Education quartile shows some separation as well, though the pattern is less monotone than population, which matches the more modest education effects in the final regression.
 
 These supporting plots also help explain why the final reduced model kept HCC score, education quartile, and population quartile. HCC score contributes a clear quantitative trend, population quartile captures a large structural difference in state size, and education quartile provides a smaller but still useful qualitative adjustment that improves fit after the major predictors are accounted for.
->>>>>>> Stashed changes
 
 \newpage
 
