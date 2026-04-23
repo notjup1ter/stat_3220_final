@@ -1,0 +1,745 @@
+---
+title: "Predicting Total Medicare Beneficiaries by State (2023)"
+author: |
+  | Team G11
+  | Sidharth Dusanapudi, Ashish Sunkarapalli,
+  | Jayden Sincere Brown, Krish Venkatram Mallina
+output:
+  pdf_document:
+    fig_caption: false
+fontsize: 12pt
+geometry:
+  - paperwidth=36in
+  - paperheight=28in
+  - margin=0.15in
+header-includes:
+  - \usepackage{graphicx}
+  - \usepackage{booktabs}
+  - \usepackage{tabularx}
+  - \usepackage{array}
+  - \usepackage{xcolor}
+  - \pagestyle{empty}
+  - \makeatletter\renewcommand{\maketitle}{}\makeatother
+  - \setlength{\parindent}{0pt}
+  - \setlength{\parskip}{1pt}
+  - \definecolor{posterblue}{HTML}{1F4E79}
+  - \definecolor{posterlight}{HTML}{EAF2F8}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE,
+  warning = FALSE,
+  message = FALSE
+)
+
+library(knitr)
+library(car)
+library(corrplot)
+
+fmt_num <- function(x, digits = 0) {
+  formatC(x, format = "f", digits = digits, big.mark = ",")
+}
+
+fmt_pval <- function(x, digits = 3) {
+  ifelse(
+    x < 10^-digits,
+    paste0("<", formatC(10^-digits, format = "f", digits = digits)),
+    formatC(x, format = "f", digits = digits)
+  )
+}
+
+quartile_factor <- function(x) {
+  cut(
+    x,
+    breaks = quantile(x, probs = seq(0, 1, 0.25), na.rm = TRUE),
+    include.lowest = TRUE,
+    labels = c("Q1 Low", "Q2", "Q3", "Q4 High")
+  )
+}
+
+manual_vif <- function(model) {
+  mm <- model.matrix(model)
+  mm <- mm[, colnames(mm) != "(Intercept)", drop = FALSE]
+  out <- sapply(seq_len(ncol(mm)), function(i) {
+    fit <- lm(mm[, i] ~ mm[, -i])
+    1 / (1 - summary(fit)$r.squared)
+  })
+  names(out) <- colnames(mm)
+  out
+}
+
+press_stat <- function(model) {
+  sum((residuals(model) / (1 - hatvalues(model)))^2)
+}
+
+term_label <- function(x) {
+  labels <- c(
+    "(Intercept)" = "Intercept",
+    "c_Avg_Age" = "Centered age",
+    "Political_AffiliationRepublican" = "Republican",
+    "Political_AffiliationSwing" = "Swing",
+    "c_HCC_Score" = "Centered HCC score",
+    "c_Pct_Male" = "Centered percent male",
+    "c_Median_Income" = "Centered median income",
+    "Education_QQ2" = "Education Q2",
+    "Education_QQ3" = "Education Q3",
+    "Education_QQ4 High" = "Education Q4 High",
+    "Physician_QQ2" = "Physician Q2",
+    "Physician_QQ3" = "Physician Q3",
+    "Physician_QQ4 High" = "Physician Q4 High",
+    "Population_QQ2" = "Population Q2",
+    "Population_QQ3" = "Population Q3",
+    "Population_QQ4 High" = "Population Q4 High",
+    "c_Avg_Age:Political_AffiliationRepublican" = "Age x Republican",
+    "c_Avg_Age:Political_AffiliationSwing" = "Age x Swing"
+  )
+  out <- labels[x]
+  out[is.na(out)] <- x[is.na(out)]
+  unname(out)
+}
+
+pct_effect <- function(beta) {
+  round(100 * (exp(beta) - 1), 1)
+}
+```
+
+```{r data-models, include=FALSE}
+raw_data <- read.csv(
+  "https://raw.githubusercontent.com/notjup1ter/stat_3220_final/refs/heads/main/medicare_2023_state_mlr.csv",
+  check.names = FALSE,
+  stringsAsFactors = FALSE
+)
+
+state_population <- as.numeric(gsub(",", "", raw_data[["TOTAL_STATE_POPULATION (Quantitative)"]]))
+state_population[raw_data$STATE == "AK"] <- 734654
+state_population[raw_data$STATE == "AL"] <- 5117850
+state_population[raw_data$STATE == "AR"] <- 3069856
+state_population[raw_data$STATE == "AZ"] <- 7452073
+
+analysis_data <- data.frame(
+  State = raw_data$STATE,
+  Beneficiaries = raw_data$BENES_TOTAL_CNT,
+  Avg_Age = raw_data$AVG_AGE,
+  HCC_Score = raw_data$HCC_SCORE,
+  Pct_Male = raw_data$PERCENT_MALE,
+  Median_Income = raw_data[["Median annual family income in the United States"]],
+  Political_Affiliation = factor(
+    raw_data[["POLITICAL_AFFILIATION (Qualitative)"]],
+    levels = c("Democrat", "Republican", "Swing")
+  ),
+  Education_Q = quartile_factor(raw_data[["% Bachelor's Degree or Higher by State (Qualitative)"]]),
+  Physician_Q = quartile_factor(raw_data[["PHYSICIANS_PER_100000 (Qualitative)"]]),
+  Population_Q = quartile_factor(state_population)
+)
+
+analysis_data$log_Beneficiaries <- log(analysis_data$Beneficiaries)
+
+model_data <- within(analysis_data, {
+  c_Avg_Age <- as.numeric(scale(Avg_Age, center = TRUE, scale = FALSE))
+  c_HCC_Score <- as.numeric(scale(HCC_Score, center = TRUE, scale = FALSE))
+  c_Pct_Male <- as.numeric(scale(Pct_Male, center = TRUE, scale = FALSE))
+  c_Median_Income <- as.numeric(scale(Median_Income, center = TRUE, scale = FALSE))
+})
+
+party_cols <- c("Democrat" = "steelblue", "Republican" = "firebrick", "Swing" = "darkgreen")
+
+response_mean <- mean(analysis_data$Beneficiaries)
+response_median <- median(analysis_data$Beneficiaries)
+response_min <- min(analysis_data$Beneficiaries)
+response_max <- max(analysis_data$Beneficiaries)
+age_r <- cor(analysis_data$Avg_Age, analysis_data$Beneficiaries)
+hcc_r <- cor(analysis_data$HCC_Score, analysis_data$Beneficiaries)
+male_r <- cor(analysis_data$Pct_Male, analysis_data$Beneficiaries)
+income_r <- cor(analysis_data$Median_Income, analysis_data$Beneficiaries)
+population_means <- tapply(analysis_data$Beneficiaries, analysis_data$Population_Q, mean)
+
+boxcox_model <- lm(
+  Beneficiaries ~ Avg_Age + HCC_Score + Pct_Male + Median_Income +
+    Political_Affiliation + Education_Q + Physician_Q + Population_Q,
+  data = analysis_data
+)
+boxcox_profile <- MASS::boxcox(boxcox_model, plotit = FALSE)
+boxcox_lambda <- boxcox_profile$x[which.max(boxcox_profile$y)]
+boxcox_cutoff <- max(boxcox_profile$y) - qchisq(0.95, df = 1) / 2
+boxcox_ci <- range(boxcox_profile$x[boxcox_profile$y > boxcox_cutoff])
+
+additive_model <- lm(
+  log_Beneficiaries ~ c_Avg_Age + c_HCC_Score + c_Pct_Male + c_Median_Income +
+    Political_Affiliation + Education_Q + Physician_Q + Population_Q,
+  data = model_data
+)
+
+screening_model <- lm(
+  log_Beneficiaries ~ c_Avg_Age * Political_Affiliation + c_HCC_Score +
+    c_Pct_Male + c_Median_Income + Education_Q + Physician_Q + Population_Q,
+  data = model_data
+)
+
+full_model <- screening_model
+no_male_model <- update(full_model, . ~ . - c_Pct_Male)
+no_male_income_model <- update(no_male_model, . ~ . - c_Median_Income)
+final_model <- update(no_male_income_model, . ~ . - Physician_Q)
+
+hcc_physician_model <- lm(
+  log_Beneficiaries ~ c_Avg_Age + c_HCC_Score * Physician_Q + c_Pct_Male +
+    c_Median_Income + Political_Affiliation + Education_Q + Population_Q,
+  data = model_data
+)
+
+income_population_model <- lm(
+  log_Beneficiaries ~ c_Avg_Age + c_HCC_Score + c_Pct_Male +
+    c_Median_Income * Population_Q + Political_Affiliation + Education_Q +
+    Physician_Q,
+  data = model_data
+)
+
+age_party_test <- anova(additive_model, screening_model)
+hcc_physician_test <- anova(additive_model, hcc_physician_model)
+income_population_test <- anova(additive_model, income_population_model)
+drop_male_test <- anova(no_male_model, full_model)
+drop_income_test <- anova(no_male_income_model, no_male_model)
+drop_physician_test <- anova(final_model, no_male_income_model)
+
+vif_values <- sort(round(manual_vif(final_model), 3), decreasing = TRUE)
+vif_terms <- term_label(names(vif_values))
+
+quant_corr <- round(cor(analysis_data[, c("Avg_Age", "HCC_Score", "Pct_Male", "Median_Income")]), 3)
+press_rmse <- sqrt(press_stat(final_model) / nrow(model_data))
+cooks <- cooks.distance(final_model)
+overall_model_p <- pf(
+  summary(final_model)$fstatistic[1],
+  summary(final_model)$fstatistic[2],
+  summary(final_model)$fstatistic[3],
+  lower.tail = FALSE
+)
+
+prediction_state <- model_data[model_data$State == "FL", ]
+prediction_count <- exp(predict(final_model, newdata = prediction_state))
+
+elimination_labels <- c("Full", "Drop Male", "Drop Income", "Final")
+elimination_aic <- c(
+  AIC(full_model),
+  AIC(no_male_model),
+  AIC(no_male_income_model),
+  AIC(final_model)
+)
+elimination_press <- c(
+  sqrt(press_stat(full_model) / nrow(model_data)),
+  sqrt(press_stat(no_male_model) / nrow(model_data)),
+  sqrt(press_stat(no_male_income_model) / nrow(model_data)),
+  sqrt(press_stat(final_model) / nrow(model_data))
+)
+
+asset_dir <- "poster_assets"
+dir.create(asset_dir, showWarnings = FALSE)
+
+data_dictionary_small <- data.frame(
+  Variable = c(
+    "Beneficiaries", "Avg\\_Age", "HCC\\_Score", "Pct\\_Male", "Median\\_Income",
+    "Political\\_Affiliation", "Education\\_Q", "Physician\\_Q", "Population\\_Q"
+  ),
+  Role = c(
+    "Response", "Quant", "Quant", "Quant", "Quant",
+    "Qual", "Qual", "Qual", "Qual"
+  ),
+  Levels_Units = c(
+    "People",
+    "Years",
+    "Risk index",
+    "Proportion",
+    "USD",
+    "Democrat, Republican, Swing",
+    "Q1 Low, Q2, Q3, Q4 High",
+    "Q1 Low, Q2, Q3, Q4 High",
+    "Q1 Low, Q2, Q3, Q4 High"
+  )
+)
+
+interaction_test_table <- data.frame(
+  Candidate = c("Age x party", "HCC x physician Q", "Income x population Q"),
+  F = round(c(
+    age_party_test$F[2],
+    hcc_physician_test$F[2],
+    income_population_test$F[2]
+  ), 3),
+  P = c(
+    fmt_pval(age_party_test[2, "Pr(>F)"]),
+    fmt_pval(hcc_physician_test[2, "Pr(>F)"]),
+    fmt_pval(income_population_test[2, "Pr(>F)"])
+  )
+)
+
+elimination_path_table <- data.frame(
+  Step = c("Full", "Drop male", "Drop income", "Final"),
+  P = c(
+    "--",
+    fmt_pval(drop_male_test[2, "Pr(>F)"]),
+    fmt_pval(drop_income_test[2, "Pr(>F)"]),
+    fmt_pval(drop_physician_test[2, "Pr(>F)"])
+  ),
+  AdjR2 = round(c(
+    summary(full_model)$adj.r.squared,
+    summary(no_male_model)$adj.r.squared,
+    summary(no_male_income_model)$adj.r.squared,
+    summary(final_model)$adj.r.squared
+  ), 3)
+)
+
+coef_mat <- summary(final_model)$coefficients
+coef_keep <- c(
+  "c_Avg_Age",
+  "Political_AffiliationRepublican",
+  "c_Avg_Age:Political_AffiliationRepublican",
+  "c_HCC_Score",
+  "Population_QQ4 High",
+  "Education_QQ4 High"
+)
+coef_snapshot <- data.frame(
+  Term = term_label(coef_keep),
+  Estimate = round(coef_mat[coef_keep, "Estimate"], 3),
+  P = fmt_pval(coef_mat[coef_keep, "Pr(>|t|)"])
+)
+```
+
+```{r poster-assets, include=FALSE}
+png(file.path(asset_dir, "eda_grid.png"), width = 3200, height = 1900, res = 220)
+par(mfrow = c(2, 3), mar = c(4.2, 4.2, 2.4, 0.9), mgp = c(2.2, 0.75, 0), cex.main = 1.02, cex.lab = 0.94, cex.axis = 0.88)
+hist(
+  analysis_data$Beneficiaries,
+  breaks = 10,
+  col = "gray80",
+  border = "white",
+  main = "Response Histogram",
+  xlab = "Beneficiaries"
+)
+plot(
+  analysis_data$HCC_Score, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "HCC score", ylab = "Beneficiaries",
+  main = "HCC vs Beneficiaries"
+)
+abline(lm(Beneficiaries ~ HCC_Score, data = analysis_data), col = "firebrick", lwd = 2)
+plot(
+  analysis_data$Avg_Age, analysis_data$log_Beneficiaries,
+  type = "n",
+  xlab = "Average age", ylab = "log(Beneficiaries)",
+  main = "Age x Party Interaction"
+)
+for (grp in levels(analysis_data$Political_Affiliation)) {
+  idx <- analysis_data$Political_Affiliation == grp
+  points(analysis_data$Avg_Age[idx], analysis_data$log_Beneficiaries[idx], pch = 19, col = party_cols[grp])
+  abline(lm(log_Beneficiaries ~ Avg_Age, data = analysis_data[idx, ]), col = party_cols[grp], lwd = 2)
+}
+legend("topright", legend = levels(analysis_data$Political_Affiliation), col = party_cols, pch = 19, bty = "n", cex = 0.72)
+boxplot(
+  Beneficiaries ~ Population_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by Population Q"
+)
+plot(
+  analysis_data$Median_Income, analysis_data$Beneficiaries,
+  pch = 19, col = "darkgreen",
+  xlab = "Median income", ylab = "Beneficiaries",
+  main = "Income vs Beneficiaries"
+)
+abline(lm(Beneficiaries ~ Median_Income, data = analysis_data), col = "firebrick", lwd = 2)
+boxplot(
+  Beneficiaries ~ Physician_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by Physician Q"
+)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "eda_strip_top.png"), width = 4200, height = 1120, res = 240)
+par(mfrow = c(1, 3), mar = c(4.0, 4.0, 2.2, 0.8), mgp = c(2.2, 0.75, 0), cex.main = 1.24, cex.lab = 1.08, cex.axis = 1.00)
+hist(
+  analysis_data$Beneficiaries,
+  breaks = 10,
+  col = "gray80",
+  border = "white",
+  main = "Response Histogram",
+  xlab = "Beneficiaries"
+)
+plot(
+  analysis_data$HCC_Score, analysis_data$Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "HCC score", ylab = "Beneficiaries",
+  main = "HCC vs Beneficiaries"
+)
+abline(lm(Beneficiaries ~ HCC_Score, data = analysis_data), col = "firebrick", lwd = 2)
+plot(
+  analysis_data$Avg_Age, analysis_data$log_Beneficiaries,
+  type = "n",
+  xlab = "Average age", ylab = "log(Beneficiaries)",
+  main = "Age x Party Interaction"
+)
+for (grp in levels(analysis_data$Political_Affiliation)) {
+  idx <- analysis_data$Political_Affiliation == grp
+  points(analysis_data$Avg_Age[idx], analysis_data$log_Beneficiaries[idx], pch = 19, col = party_cols[grp])
+  abline(lm(log_Beneficiaries ~ Avg_Age, data = analysis_data[idx, ]), col = party_cols[grp], lwd = 2)
+}
+legend("topright", legend = levels(analysis_data$Political_Affiliation), col = party_cols, pch = 19, bty = "n", cex = 0.90)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "eda_strip_bottom.png"), width = 4200, height = 1120, res = 240)
+par(mfrow = c(1, 3), mar = c(4.0, 4.0, 2.2, 0.8), mgp = c(2.2, 0.75, 0), cex.main = 1.24, cex.lab = 1.08, cex.axis = 1.00)
+boxplot(
+  Beneficiaries ~ Population_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by Population Q"
+)
+plot(
+  analysis_data$Median_Income, analysis_data$Beneficiaries,
+  pch = 19, col = "darkgreen",
+  xlab = "Median income", ylab = "Beneficiaries",
+  main = "Income vs Beneficiaries"
+)
+abline(lm(Beneficiaries ~ Median_Income, data = analysis_data), col = "firebrick", lwd = 2)
+boxplot(
+  Beneficiaries ~ Physician_Q,
+  data = analysis_data,
+  col = "gray80",
+  xlab = "",
+  ylab = "Beneficiaries",
+  main = "Beneficiaries by Physician Q"
+)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "corrplot.png"), width = 1500, height = 1200, res = 220)
+corrplot(
+  quant_corr,
+  method = "color",
+  addCoef.col = "black",
+  tl.col = "black",
+  tl.cex = 0.95,
+  number.cex = 0.78
+)
+dev.off()
+
+png(file.path(asset_dir, "model_strip.png"), width = 4200, height = 950, res = 240)
+layout(matrix(1:3, nrow = 1))
+par(mar = c(1.0, 1.0, 2.2, 0.5))
+corrplot(
+  quant_corr,
+  method = "color",
+  addCoef.col = "black",
+  tl.col = "black",
+  tl.cex = 1.05,
+  number.cex = 0.92,
+  title = "Correlation Plot",
+  mar = c(0, 0, 1.4, 0)
+)
+par(mar = c(4.0, 4.0, 2.2, 0.8), mgp = c(2.2, 0.75, 0), cex.main = 1.14, cex.lab = 1.0, cex.axis = 0.92)
+plot(
+  boxcox_profile$x, boxcox_profile$y,
+  type = "l", lwd = 2, col = "steelblue",
+  xlab = expression(lambda), ylab = "Profile log-likelihood",
+  main = "Box-Cox Profile"
+)
+abline(v = boxcox_lambda, col = "firebrick", lty = 2, lwd = 2)
+abline(v = 0, col = "darkgreen", lty = 3, lwd = 2)
+legend(
+  "bottomleft",
+  legend = c("Estimated lambda", "Log transform"),
+  col = c("firebrick", "darkgreen"),
+  lty = c(2, 3),
+  bty = "n",
+  cex = 0.80
+)
+plot(
+  fitted(final_model), model_data$log_Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "Fitted values", ylab = "Observed log(Beneficiaries)",
+  main = "Observed vs Fitted"
+)
+abline(0, 1, col = "firebrick", lwd = 2)
+layout(1)
+dev.off()
+
+png(file.path(asset_dir, "elimination_grid.png"), width = 2400, height = 1200, res = 220)
+par(mfrow = c(1, 2), mar = c(4.2, 4.2, 2.4, 1.0), mgp = c(2.2, 0.7, 0), cex.main = 0.95, cex.lab = 0.9, cex.axis = 0.85)
+plot(
+  seq_along(elimination_aic), elimination_aic,
+  type = "b", pch = 19, col = "steelblue",
+  xaxt = "n", xlab = "Elimination step", ylab = "AIC",
+  main = "AIC Across Elimination"
+)
+axis(1, at = seq_along(elimination_labels), labels = elimination_labels, cex.axis = 0.8)
+plot(
+  seq_along(elimination_press), elimination_press,
+  type = "b", pch = 19, col = "firebrick",
+  xaxt = "n", xlab = "Elimination step", ylab = "PRESS RMSE",
+  main = "PRESS RMSE Across Elimination"
+)
+axis(1, at = seq_along(elimination_labels), labels = elimination_labels, cex.axis = 0.8)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "elimination_strip.png"), width = 4200, height = 950, res = 240)
+par(mfrow = c(1, 2), mar = c(4.0, 4.0, 2.2, 0.8), mgp = c(2.2, 0.75, 0), cex.main = 1.14, cex.lab = 1.0, cex.axis = 0.92)
+plot(
+  seq_along(elimination_aic), elimination_aic,
+  type = "b", pch = 19, col = "steelblue",
+  xaxt = "n", xlab = "Elimination step", ylab = "AIC",
+  main = "AIC Across Elimination"
+)
+axis(1, at = seq_along(elimination_labels), labels = elimination_labels, cex.axis = 0.86)
+plot(
+  seq_along(elimination_press), elimination_press,
+  type = "b", pch = 19, col = "firebrick",
+  xaxt = "n", xlab = "Elimination step", ylab = "PRESS RMSE",
+  main = "PRESS RMSE Across Elimination"
+)
+axis(1, at = seq_along(elimination_labels), labels = elimination_labels, cex.axis = 0.86)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "boxcox.png"), width = 1500, height = 1100, res = 220)
+plot(
+  boxcox_profile$x, boxcox_profile$y,
+  type = "l", lwd = 2, col = "steelblue",
+  xlab = expression(lambda), ylab = "Profile log-likelihood",
+  main = "Box-Cox Profile"
+)
+abline(v = boxcox_lambda, col = "firebrick", lty = 2, lwd = 2)
+abline(v = 0, col = "darkgreen", lty = 3, lwd = 2)
+legend(
+  "bottomleft",
+  legend = c("Estimated lambda", "Log transform"),
+  col = c("firebrick", "darkgreen"),
+  lty = c(2, 3),
+  bty = "n",
+  cex = 0.82
+)
+dev.off()
+
+png(file.path(asset_dir, "diagnostics_grid.png"), width = 2400, height = 2000, res = 220)
+par(mfrow = c(2, 2), mar = c(4.2, 4.2, 2.3, 1.1), mgp = c(2.2, 0.75, 0), cex.main = 0.98, cex.lab = 0.92, cex.axis = 0.86)
+plot(final_model, which = 1)
+plot(final_model, which = 2)
+plot(final_model, which = 3)
+plot(
+  cooks,
+  type = "h",
+  lwd = 2,
+  col = "steelblue",
+  xlab = "State index",
+  ylab = "Cook's distance",
+  main = "Cook's Distance"
+)
+abline(h = 4 / nrow(model_data), col = "firebrick", lty = 2)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "diagnostics_strip.png"), width = 5200, height = 1180, res = 240)
+par(mfrow = c(1, 4), mar = c(4.0, 4.0, 2.0, 0.8), mgp = c(2.2, 0.75, 0), cex.main = 1.05, cex.lab = 0.95, cex.axis = 0.88)
+plot(final_model, which = 1)
+plot(final_model, which = 2)
+plot(final_model, which = 3)
+plot(
+  cooks,
+  type = "h",
+  lwd = 2,
+  col = "steelblue",
+  xlab = "State index",
+  ylab = "Cook's distance",
+  main = "Cook's Distance"
+)
+abline(h = 4 / nrow(model_data), col = "firebrick", lty = 2)
+par(mfrow = c(1, 1))
+dev.off()
+
+png(file.path(asset_dir, "observed_fitted.png"), width = 1500, height = 1100, res = 220)
+plot(
+  fitted(final_model), model_data$log_Beneficiaries,
+  pch = 19, col = "steelblue",
+  xlab = "Fitted values", ylab = "Observed log(Beneficiaries)",
+  main = "Observed vs Fitted"
+)
+abline(0, 1, col = "firebrick", lwd = 2)
+dev.off()
+```
+
+\newsavebox{\posterboxbox}
+\newcommand{\posterboxtitle}[1]{\noindent\colorbox{posterblue}{\parbox{\dimexpr0.98\linewidth+2\fboxrule\relax}{\color{white}\bfseries\Huge #1}}}
+\newenvironment{posterbox}[1]{\par\posterboxtitle{#1}\par\noindent\begin{lrbox}{\posterboxbox}\begin{minipage}{0.98\linewidth}\fontsize{21.6}{23.8}\selectfont}{\end{minipage}\end{lrbox}\fcolorbox{posterblue}{white}{\usebox{\posterboxbox}}\par}
+
+\begin{center}
+{\fontsize{28}{30}\selectfont \textbf{Predicting Total Medicare Beneficiaries by State (2023)}}\\[-0.02in]
+{\LARGE Team G11: Sidharth Dusanapudi, Ashish Sunkarapalli, Jayden Sincere Brown, Krish Venkatram Mallina}
+\end{center}
+
+\vspace{-0.12in}
+\enlargethispage{10in}
+
+\noindent
+\begin{minipage}[t]{0.492\textwidth}
+\begin{posterbox}{1. Introduction + Data Description}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item This project studies why total Medicare beneficiary counts differ across U.S. states in 2023.
+\item Medicare is a major part of the U.S. healthcare system, so state differences may reflect aging, population size, and healthcare need (CMS, 2025; U.S. Census Bureau, 2024).
+\item A key benefit of the analysis is that it compares demographic, health, socioeconomic, access, and political variables in one state-level model.
+\item The unit of analysis is the state, with one observation for each of the 50 states, and the results describe association rather than causation.
+\end{itemize}
+
+\textbf{Research Questions}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item We hypothesize that states with a higher average age and a Democratic political affiliation will have fewer total Medicare beneficiaries compared to Republican states.
+\item We hypothesize that states with greater healthcare provider availability (physicians per 100,000 residents) will have higher total Medicare beneficiary counts.
+\item We hypothesize that states with higher median family incomes will have lower total Medicare beneficiary counts.
+\end{itemize}
+
+\textbf{Data Description}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item The final data set contains one 2023 observation for each of the 50 states, with Medicare counts from CMS and additional predictors from Census/ACS, Becker's ASC Review, and 270toWin.
+\item Quantitative predictors: average age, HCC score, percent male, and median family income.
+\item Qualitative predictors: political affiliation, education quartile, physician quartile, and population quartile.
+\item Education, physician availability, and population were converted to quartiles; AK, AL, AR, and AZ population values were corrected before quartile creation.
+\item This design lets us compare broad state-level patterns rather than individual Medicare use.
+\end{itemize}
+
+\begin{center}
+{\fontsize{12.8}{13.8}\selectfont
+\begin{tabularx}{0.98\linewidth}{@{}l c X@{}}
+\toprule
+\textbf{Variable} & \textbf{Role} & \textbf{Levels / Units} \\
+\midrule
+Beneficiaries & Response & People \\
+Avg\_Age & Quant & Years \\
+HCC\_Score & Quant & Risk index \\
+Pct\_Male & Quant & Proportion \\
+Median\_Income & Quant & U.S. dollars \\
+Political\_Affiliation & Qual & Democrat, Republican, Swing \\
+Education\_Q & Qual & Q1 Low, Q2, Q3, Q4 High \\
+Physician\_Q & Qual & Q1 Low, Q2, Q3, Q4 High \\
+Population\_Q & Qual & Q1 Low, Q2, Q3, Q4 High \\
+\bottomrule
+\end{tabularx}
+}
+\end{center}
+\end{posterbox}
+
+\vspace{0.012in}
+
+\begin{posterbox}{2. EDA}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item The response was strongly right-skewed: mean = `r fmt_num(response_mean, 0)`, median = `r fmt_num(response_median, 0)`, and range = `r fmt_num(response_min, 0)` to `r fmt_num(response_max, 0)`.
+\item HCC score had the clearest quantitative relationship with the response ($r = `r round(hcc_r, 3)`$), population quartile was the strongest qualitative predictor, and age by political affiliation showed the strongest interaction pattern.
+\item Median income and physician quartile were visually weaker, so they needed formal testing in the regression model.
+\item Percent male and education quartile were also reviewed during EDA and kept available for modeling even though they are not plotted here.
+\end{itemize}
+
+\begin{center}
+\includegraphics[width=\linewidth]{poster_assets/eda_strip_top.png}
+\end{center}
+\vspace{-0.01in}
+\textit{Top row: the response histogram, the strongest quantitative predictor, and the clearest interaction pattern.}
+
+\vspace{0.03in}
+\begin{center}
+\includegraphics[width=\linewidth]{poster_assets/eda_strip_bottom.png}
+\end{center}
+\vspace{-0.01in}
+\textit{Bottom row: the strongest qualitative separation plus the weaker income and physician patterns that were carried forward for formal testing.}
+\vspace{0.30in}
+\end{posterbox}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.492\textwidth}
+\begin{posterbox}{3. Variable Selection + Model Building}
+\textbf{Variable Selection + Multicollinearity}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item Screening combined EDA, interaction tests, and multicollinearity checks; the largest VIF in the retained interaction model was `r round(max(vif_values), 2)`, so collinearity was moderate but acceptable.
+\item HCC score, population quartile, and age x political affiliation emerged as the most important variables for modeling.
+\end{itemize}
+
+\textbf{Model Building + Added Technique}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item We began with an additive model using all 8 predictors and tested age x political affiliation, HCC x physician quartile, and income x population quartile.
+\item Nested F tests were used for interaction and grouped-term comparisons, t tests were used for individual coefficients, and the global F test evaluated the final reduced model.
+\item Only age x political affiliation improved fit (F = `r round(age_party_test$F[2], 3)`, p = `r fmt_pval(age_party_test[2, "Pr(>F)"])`), so backward elimination then removed percent male, median income, and physician quartile.
+\item Box-Cox was the added technique; it supported a log response transformation with $\hat{\lambda} = `r round(boxcox_lambda, 2)`$ and support interval [`r round(boxcox_ci[1], 2)`, `r round(boxcox_ci[2], 2)`], which improved the modeling scale.
+\end{itemize}
+
+\begin{center}
+\includegraphics[width=0.98\linewidth]{poster_assets/model_strip.png}
+\end{center}
+
+\vspace{0.03in}
+\begin{center}
+\includegraphics[width=0.98\linewidth]{poster_assets/elimination_strip.png}
+\end{center}
+\end{posterbox}
+
+\vspace{0.012in}
+
+\begin{posterbox}{4. Residual Analysis + Final Findings}
+\textbf{Residual Analysis}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item Linearity, constant variance, and normality looked reasonable after the log transform; residual plots showed no severe pattern and $\mathrm{cor}(|e|,\hat{y}) \approx -0.105$.
+\item NH, ME, and UT had the highest leverage, while TX and ND had the largest Cook's distances; no single state dominated the fit (max Cook's D $\approx 0.114$).
+\end{itemize}
+
+\textbf{Final Model Assessment}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item The final model retained age, political affiliation, age x political affiliation, HCC score, education quartile, and population quartile.
+\item Model quality was supported by adjusted $R^2 = `r fmt_num(summary(final_model)$adj.r.squared, 3)`$, residual standard error = `r fmt_num(summary(final_model)$sigma, 3)`, PRESS RMSE = `r fmt_num(press_rmse, 3)`, and a highly significant global F test ($p < 0.001$).
+\end{itemize}
+
+\begin{center}
+\includegraphics[width=0.98\linewidth]{poster_assets/diagnostics_strip.png}
+\end{center}
+\vspace{0.05in}
+\end{posterbox}
+\end{minipage}
+
+\vspace{-0.30in}
+\begin{posterbox}{5. Key Takeaways + Future Work}
+\textbf{Conclusion + Interpretation}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item The strongest predictors of Medicare beneficiary totals were HCC score, population quartile, and the interaction between age and political affiliation.
+\item The first research question was supported: the relationship between age and Medicare beneficiary totals differed by political affiliation rather than following one common slope across all states.
+\item Holding other variables fixed, a 0.10 increase in HCC score corresponded to about 151\% higher expected beneficiary totals, and states in population quartile 4 had about 108\% higher expected totals than quartile 1 states.
+\item Physician availability and median income were not supported after adjustment, which means research questions 2 and 3 were not supported in the final model.
+\item Example prediction: Florida had a predicted total of about `r fmt_num(prediction_count, 0)` beneficiaries versus an observed total of `r fmt_num(prediction_state$Beneficiaries, 0)`.
+\end{itemize}
+
+\textbf{Future Research}
+\begin{itemize}\itemsep0.02em \parskip0pt \parsep0pt
+\item Future work could extend the analysis to multiple years or county-level data and add variables such as percent age 65+, disability prevalence, rurality, hospital capacity, and Medicare Advantage enrollment (CMS, 2025; U.S. Census Bureau, 2024).
+\end{itemize}
+\end{posterbox}
+
+\vspace{-0.02in}
+
+\begin{posterbox}{6. Sources}
+{\fontsize{12.0}{13.2}\selectfont
+\begin{minipage}[t]{0.49\linewidth}
+\begin{itemize}\itemsep-0.06em \parskip0pt \parsep0pt
+\item Age and sex. (2023). \textit{American Community Survey}. \url{https://data.census.gov/chart/ACSST1Y2023.S0101?q=median+age+by+state&measure=LINE32&sort=abc}
+\item Electoral map: Blue or red states since 2000. (2026). \textit{270toWin}. \url{https://www.270towin.com/states/}
+\item Medicare geographic variation - by national, state \& county. (2025). \textit{Centers for Medicare \& Medicaid Services}. \url{https://data.cms.gov/summary-statistics-on-use-and-payments/medicare-geographic-comparisons/medicare-geographic-variation-by-national-state-county}
+\item Newitt, P. (2025). \textit{Physicians per capita in all 50 states}. \textit{Becker's ASC Review}. \url{https://www.beckersasc.com/asc-news/physicians-per-capita-in-all-50-states-2/}
+\end{itemize}
+\end{minipage}\hfill
+\begin{minipage}[t]{0.49\linewidth}
+\begin{itemize}\itemsep-0.06em \parskip0pt \parsep0pt
+\item U.S. Census Bureau. (2024, September 15). \textit{Median annual family income in the United States in 2023, by state (in U.S. dollars)} [Graph]. In \textit{Statista}. Retrieved April 12, 2026, from \url{https://www.statista.com/statistics/236804/median-family-income-in-the-united-states-by-state/}
+\item Erickson, W., Lee, C., \& von Schrader, S. (2026). \textit{Disability statistics from the American Community Survey (ACS)}. Cornell University Yang-Tan Institute. \url{https://www.disabilitystatistics.org/}
+\item OpenAI. (2026). \textit{ChatGPT} [Large language model]. \url{https://chatgpt.com/}
+\end{itemize}
+\end{minipage}
+}
+\end{posterbox}
