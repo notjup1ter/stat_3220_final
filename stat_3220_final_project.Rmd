@@ -454,8 +454,8 @@ elimination_press <- c(
 
 ## Introduction
 
-1.  Do states with certain combinations of average age and political affiliation have higher total Medicare beneficiary counts?\
-2.  Do states with greater healthcare provider availability ( measured by physicians per 100,000 residents) have higher total Medicare beneficiary counts?
+1.  Do states with higher average age and a Democratic political affiliation correlate to having fewer total Medicare beneficiaries?
+2.  Do states with greater healthcare provider availability (physicians per 100,000) have higher total Medicare beneficiary counts?
 3.  Do states with higher median family incomes have lower total Medicare beneficiary counts?
 
 ## Data Summary
