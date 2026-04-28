@@ -520,12 +520,11 @@ compact_kable(
 
 `head()` of the cleaned analysis data.
 
-```{r appendix-b, echo=FALSE, results='asis'}
-compact_kable(
-  display_head,
-  align = c("l", rep("r", 10))
-)
+```{r}
+head(analysis_data)
 ```
+
+Note: output comes out in 2 rows (from 1-6) due to page width constraints. These may be considered as one continuous row.
 
 \newpage
 
