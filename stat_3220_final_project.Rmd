@@ -454,6 +454,8 @@ elimination_press <- c(
 
 ## Introduction
 
+Total medicare beneficiaries serves as a measure of a demographic's healthcare need, and government officials can use this information to apportion resources to hire a sufficient number of healthcare workers. We will build a model that predicts total medicare beneficiaries per US state based on multiple factors chosen through reputable primary and secondary sources. If successful, this model will be vital in accurately predicting the healthcare needs of states, allowing lawmakers to designate the correct resources towards the healthcare sector each year.
+
 1.  Do states with higher average age and a Democratic political affiliation correlate to having fewer total Medicare beneficiaries?
 2.  Do states with greater healthcare provider availability (physicians per 100,000) have higher total Medicare beneficiary counts?
 3.  Do states with higher median family incomes have lower total Medicare beneficiary counts?
@@ -462,7 +464,7 @@ elimination_press <- c(
 
 **Metadata Summary**
 
-The response variable and the state-level Medicare summaries were taken from the 2023 CMS Medicare Geographic Variation files, which provide the beneficiary count, average age, HCC score, and percent male for each state. Additional state characteristics were merged from recent public sources: family income from Statista/Census reporting, educational attainment from the American Community Survey, physician availability from Becker's ASC Review, and political affiliation from recent electoral patterns. The final analytic data set contains one 2023 observation for each of the 50 states, so the unit of analysis is the state rather than the individual beneficiary.
+The response variable and the state-level Medicare summaries were taken from the 2023 CMS Medicare Geographic Variation files, which provide the beneficiary count, average age, HCC score, and percent male for each state. Additional state characteristics were merged from recent public sources: median family income from Statista/Census reporting, educational attainment from the American Community Survey, physician availability from Becker's ASC Review, and political affiliation from recent electoral patterns. The final analytic data set contains one 2023 observation for each of the 50 states, so the unit of analysis is the state rather than the individual beneficiary.
 
 Several variable manipulations were needed before modeling. Education, physician availability, and total state population were converted to quartiles so that the qualitative predictors had interpretable four-level groupings, matching the project requirements. The total-state-population entries for AK, AL, AR, and AZ were also realigned to their correct states before the population quartiles were created. The main reliability concern is that the file combines several sources that were collected with different procedures, and the quartile coding simplifies the original numeric measures. Even with that limitation, the merged data set is appropriate for a state-level exploratory regression analysis because all variables describe the same general 2023 setting.
 
