@@ -136,9 +136,9 @@ data_dictionary <- data.frame(
     "Median\\_Income", "Political\\_Affiliation", "Education\\_Q",
     "Physician\\_Q", "Population\\_Q"
   ),
-  Type = c(
-    "Identifier", "Response", "Quantitative", "Quantitative", "Quantitative",
-    "Quantitative", "Qualitative", "Qualitative", "Qualitative", "Qualitative"
+  Abbreviation = c(
+    "State", "Benef", "Age", "HCC", "PctMale",
+    "Income", "Party", "EduQ", "PhysQ", "PopQ"
   ),
   Description = c(
     "Two-letter state abbreviation.",
@@ -742,7 +742,7 @@ compact_kable(
 )
 ```
 
-This summary condenses the most important model-checking numbers onto one page. In particular, the small difference between residual standard error and PRESS RMSE suggests that the final model is not overfit relative to the size of the data set, while the leverage, studentized-residual, and Cook's-distance values give a compact screen for unusual or influential states.
+In particular, the small difference between residual standard error and PRESS RMSE suggests that the final model is not overfit relative to the size of the data set, while the leverage, studentized-residual, and Cook's-distance values give a compact screen for unusual or influential states.
 
 \newpage
 
